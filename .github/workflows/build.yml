@@ -1,0 +1,99 @@
+# Builds ready-to-run PDF Cutter apps for Windows, macOS and Linux.
+# Every push to the default branch publishes them as a new GitHub Release,
+# so you can download the app from the "Releases" section of the repo page.
+
+name: Build app
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write # needed to publish releases
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt pytest
+      - run: pytest -q
+
+  build:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            asset: PDF-Cutter-Windows.exe
+          - os: macos-latest
+            asset: PDF-Cutter-macOS.zip
+          - os: ubuntu-latest
+            asset: PDF-Cutter-Linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt pyinstaller
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          pyinstaller --noconfirm --onefile --windowed --name PDF-Cutter --collect-data pptx app.py
+          Move-Item dist\PDF-Cutter.exe ${{ matrix.asset }}
+      - name: Self-test (Windows)
+        if: runner.os == 'Windows'
+        timeout-minutes: 5
+        run: |
+          $p = Start-Process -FilePath .\${{ matrix.asset }} -ArgumentList '--self-test' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Write-Error "self-test failed with exit code $($p.ExitCode)"; exit 1 }
+
+      - name: Build (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          pyinstaller --noconfirm --windowed --name "PDF Cutter" --osx-bundle-identifier io.github.pdfcutter --collect-data pptx app.py
+          "dist/PDF Cutter.app/Contents/MacOS/PDF Cutter" --self-test
+          ditto -c -k --sequesterRsrc --keepParent "dist/PDF Cutter.app" ${{ matrix.asset }}
+
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          pyinstaller --noconfirm --onefile --windowed --name PDF-Cutter --collect-data pptx app.py
+          mv dist/PDF-Cutter ${{ matrix.asset }}
+          ./${{ matrix.asset }} --self-test
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: github.event_name == 'workflow_dispatch' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: PDF Cutter 1.0.${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          files: assets/*
+          body: |
+            Download the file for your computer below (under **Assets**):
+
+            - **Windows:** `PDF-Cutter-Windows.exe`. Double-click it. If Windows shows "Windows protected your PC", click **More info → Run anyway**.
+            - **Mac (Apple Silicon, M1 or newer):** `PDF-Cutter-macOS.zip`. Unzip it and move **PDF Cutter** to Applications. The first time, macOS will block it: open **System Settings → Privacy & Security** and click **Open Anyway**.
+            - **Linux:** `PDF-Cutter-Linux`. Run `chmod +x PDF-Cutter-Linux` once, then start it.
