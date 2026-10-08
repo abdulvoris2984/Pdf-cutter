@@ -105,10 +105,15 @@ def make_plan(total: int, mode: str, value: str, unit: str = "pages") -> list[Ra
 
 
 def output_paths(source: Path, parts: int, out_dir: Path | None = None) -> list[Path]:
-    """exam.pdf -> exam1.pdf, exam2.pdf, ... (next to the source unless out_dir is given)."""
+    """exam.pdf -> exam1.pdf, exam2.pdf, ... (next to the source unless out_dir is given).
+
+    Names that already end in a number get an underscore, so lecture03.pptx
+    becomes lecture03_1.pptx instead of the confusing lecture031.pptx.
+    """
     source = Path(source)
     folder = Path(out_dir) if out_dir else source.parent
-    return [folder / f"{source.stem}{i}{source.suffix}" for i in range(1, parts + 1)]
+    stem = source.stem + ("_" if source.stem[-1:].isdigit() else "")
+    return [folder / f"{stem}{i}{source.suffix}" for i in range(1, parts + 1)]
 
 
 # --------------------------------------------------------------------------- #

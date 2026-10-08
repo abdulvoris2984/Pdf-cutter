@@ -1,3 +1,6 @@
 pypdf>=5.0
 cryptography>=42  # lets pypdf open "copy-protected" (AES-encrypted) PDFs
 python-pptx>=1.0
+customtkinter>=5.2  # modern-looking widgets with light/dark mode
+tkinterdnd2>=0.4  # drag and drop
+pillow>=10  # images in the UI

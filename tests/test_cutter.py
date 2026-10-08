@@ -87,6 +87,11 @@ def test_output_paths(tmp_path):
     assert cutter.output_paths(src, 2, other)[1] == other / "exam2.pdf"
 
 
+def test_output_paths_for_names_ending_in_a_number(tmp_path):
+    src = tmp_path / "Lecture 03.pptx"
+    assert [p.name for p in cutter.output_paths(src, 2)] == ["Lecture 03_1.pptx", "Lecture 03_2.pptx"]
+
+
 def test_unsupported_files(tmp_path):
     for name in ["notes.ppt", "notes.docx"]:
         path = tmp_path / name
